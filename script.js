@@ -1,90 +1,100 @@
+// ================= CANVAS =================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Audio
-const bgm = document.getElementById("bgm");
-const swordSfx = document.getElementById("swordSfx");
-const enemyHitSfx = document.getElementById("enemyHitSfx");
-bgm.volume = 0.5;
-bgm.play();
+// ================ PLAYER ====================
+let player = { x: 80, y: 300, w: 35, h: 50, dx: 0, dy: 0, speed: 4, jump: -12, onGround: false };
 
-// Pedang image
-const swordImg = new Image();
-swordImg.src = "sword.png";
+// ================ PLATFORM ==================
+const platforms = [
+  { x: 0, y: 380, w: 800, h: 70 },
+  { x: 200, y: 300, w: 140, h: 20 },
+  { x: 430, y: 240, w: 160, h: 20 }
+];
 
-// Player
-let player = {
-    x: 80, y: 300, w: 35, h: 50,
-    dx: 0, dy: 0, speed: 4, jump: -12,
-    onGround: false, attacking: false, facingRight: true
-};
+// ================ KEY ==================
+let key = { x: 480, y: 190, w: 25, h: 25, taken: false };
 
-// Enemy
-let enemy = {
-    x: 260, y: 260, w: 35, h: 40,
-    dir: 1, speed: 2, minX: 200, maxX: 360,
-    dead: false
-};
+// ================ DOOR ==================
+let door = { x: 700, y: 330, w: 50, h: 70, open: false };
 
-// Key input
-let keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+// ================ PHYSICS ==================
+const gravity = 0.6;
 
-// Attack — J
-document.addEventListener("keydown", e => {
-  if (e.key.toLowerCase() === "j" && !player.attacking) {
-      player.attacking = true;
-      swordSfx.currentTime = 0;
-      swordSfx.play();
-      setTimeout(() => player.attacking = false, 300);
-  }
-});
+// ================= INPUT =================
+const keysPressed = {};
+document.addEventListener("keydown", (e) => keysPressed[e.key] = true);
+document.addEventListener("keyup", (e) => keysPressed[e.key] = false);
 
+// ================= QUESTION =================
+function askQuestion() {
+    const q = [
+        { t: "Planet terbesar di tata surya?", a: "jupiter" },
+        { t: "Ibukota negara Indonesia?", a: "jakarta" },
+        { t: "Hewan tercepat di darat?", a: "cheetah" },
+        { t: "Berapa warna pada pelangi?", a: "7" },
+        { t: "Lambang unsur O pada tabel periodik adalah?", a: "oksigen" }
+    ];
+
+    const random = q[Math.floor(Math.random() * q.length)];
+    const answer = prompt("Pertanyaan:\n" + random.t + "\n\nJawaban:");
+
+    if (!answer) return false;
+    return answer.trim().toLowerCase() === random.a;
+}
+
+// ================= GAME LOOP =================
 function update() {
     // Movement
-    if (keys["ArrowRight"] || keys["d"]) { player.dx = player.speed; player.facingRight = true; }
-    else if (keys["ArrowLeft"] || keys["a"]) { player.dx = -player.speed; player.facingRight = false; }
+    if (keysPressed["ArrowLeft"] || keysPressed["a"]) player.dx = -player.speed;
+    else if (keysPressed["ArrowRight"] || keysPressed["d"]) player.dx = player.speed;
     else player.dx = 0;
 
-    if ((keys["ArrowUp"] || keys["w"] || keys[" "]) && player.onGround) {
+    if ((keysPressed["ArrowUp"] || keysPressed["w"] || keysPressed[" "]) && player.onGround) {
         player.dy = player.jump;
+        player.onGround = false;
     }
 
-    player.dy += 0.5;
+    player.dy += gravity;
     player.x += player.dx;
     player.y += player.dy;
 
-    // Floor
-    if (player.y + player.h >= 470) {
-        player.y = 470 - player.h;
-        player.onGround = true;
-        player.dy = 0;
-    } else player.onGround = false;
+    // Collision with platforms
+    player.onGround = false;
+    platforms.forEach(p => {
+        if (player.x < p.x + p.w && player.x + player.w > p.x &&
+            player.y < p.y + p.h && player.y + player.h > p.y && player.dy > 0) {
+            player.y = p.y - player.h;
+            player.dy = 0;
+            player.onGround = true;
+        }
+    });
 
-    // Enemy walking (patrol)
-    if (!enemy.dead) {
-        enemy.x += enemy.dir * enemy.speed;
-        if (enemy.x <= enemy.minX || enemy.x >= enemy.maxX) enemy.dir *= -1;
-    }
+    // Take key = question
+    if (!key.taken &&
+        player.x < key.x + key.w && player.x + player.w > key.x &&
+        player.y < key.y + key.h && player.y + player.h > key.y) {
 
-    // Attack enemy
-    if (!enemy.dead && player.attacking) {
-        let swordX = player.facingRight ? player.x + player.w : player.x - 30;
-        let swordY = player.y;
+        key.taken = true;
+        let result = askQuestion();
 
-        if (swordX < enemy.x + enemy.w && swordX + 30 > enemy.x &&
-            swordY < enemy.y + enemy.h && swordY + player.h > enemy.y) {
-            enemy.dead = true;
-            enemyHitSfx.currentTime = 0;
-            enemyHitSfx.play();
+        if (result) {
+            door.open = true;
+            alert("Jawaban BENAR! Pintu terbuka!");
+        } else {
+            alert("Jawaban SALAH! Coba lagi ya!");
+            key.taken = false; // key appears again
+            key.x = 480;
+            key.y = 190;
         }
     }
 
-    // Touch enemy (if alive)
-    if (!enemy.dead && player.x < enemy.x + enemy.w && player.x + player.w > enemy.x &&
-        player.y < enemy.y + enemy.h && player.y + player.h > enemy.y) {
-        alert("💀 Kamu tersentuh musuh!");
+    // Win detection
+    if (door.open &&
+        player.x < door.x + door.w && player.x + player.w > door.x &&
+        player.y < door.y + door.h && player.y + player.h > door.y) {
+
+        alert("🎉 SELAMAT! Kamu berhasil!");
         location.reload();
     }
 
@@ -92,28 +102,28 @@ function update() {
     requestAnimationFrame(update);
 }
 
+// ================= DRAW =================
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Ground
-    ctx.fillStyle = "#4b8b1e";
-    ctx.fillRect(0, 470, canvas.width, 50);
+    // Platforms
+    ctx.fillStyle = "#654321";
+    platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
 
     // Player
-    ctx.fillStyle = "#4444ff";
+    ctx.fillStyle = "red";
     ctx.fillRect(player.x, player.y, player.w, player.h);
 
-    // Sword sprite visible only when attacking
-    if (player.attacking) {
-        let sx = player.facingRight ? player.x + player.w : player.x - 30;
-        ctx.drawImage(swordImg, sx, player.y + 5, 30, 30);
+    // Key
+    if (!key.taken) {
+        ctx.fillStyle = "gold";
+        ctx.fillRect(key.x, key.y, key.w, key.h);
     }
 
-    // Enemy
-    if (!enemy.dead) {
-        ctx.fillStyle = "red";
-        ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
-    }
+    // Door
+    ctx.fillStyle = door.open ? "green" : "brown";
+    ctx.fillRect(door.x, door.y, door.w, door.h);
 }
 
+// START
 update();
