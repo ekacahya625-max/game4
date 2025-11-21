@@ -1,13 +1,13 @@
 body {
-    background: #191919;
-    margin: 0;
-    overflow: hidden;
+    background: #252525;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
+    margin: 0;
 }
+
 canvas {
-    background: linear-gradient(#6ec6ff, #ffffff);
-    border: 4px solid #000;
+    background: #8fd1ff;
+    border: 3px solid black;
 }
